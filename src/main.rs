@@ -1,68 +1,99 @@
-//! Blinks the LED on a Pico board
-//!
-//! This will blink an LED attached to GP25, which is the pin the Pico uses for the on-board LED.
 #![no_std]
 #![no_main]
 
-use bsp::entry;
+mod bsp;
+
+use bsp::XOSC_CRYSTAL_FREQ;
 use defmt::*;
 use defmt_rtt as _;
-use embedded_hal::digital::v2::OutputPin;
+use hal::pac;
 use panic_probe as _;
+use rp2040_hal as hal;
+use rp2040_monotonic::{ExtU64, Rp2040Monotonic};
 
-// Provide an alias for our BSP so we can switch targets quickly.
-// Uncomment the BSP you included in Cargo.toml, the rest of the code does not need to change.
-use rp_pico as bsp;
-// use sparkfun_pro_micro_rp2040 as bsp;
+use hal::gpio::{bank0::Gpio25, Output, Pin, PushPull};
 
-use bsp::hal::{
-    clocks::{init_clocks_and_plls, Clock},
-    pac,
-    sio::Sio,
-    watchdog::Watchdog,
-};
+// GPIO traits
+use embedded_hal::digital::v2::{OutputPin, ToggleableOutputPin};
 
-#[entry]
-fn main() -> ! {
-    info!("Program start");
-    let mut pac = pac::Peripherals::take().unwrap();
-    let core = pac::CorePeripherals::take().unwrap();
-    let mut watchdog = Watchdog::new(pac.WATCHDOG);
-    let sio = Sio::new(pac.SIO);
+// Bind software tasks to SIO_IRQ_PROC0, we're not using it
+#[rtic::app(device = pac, peripherals = true, dispatchers = [SIO_IRQ_PROC0])]
+mod app {
+    use super::*;
 
-    // External high-speed crystal on the pico board is 12Mhz
-    let external_xtal_freq_hz = 12_000_000u32;
-    let clocks = init_clocks_and_plls(
-        external_xtal_freq_hz,
-        pac.XOSC,
-        pac.CLOCKS,
-        pac.PLL_SYS,
-        pac.PLL_USB,
-        &mut pac.RESETS,
-        &mut watchdog,
-    )
-    .ok()
-    .unwrap();
+    #[shared]
+    struct Shared {}
 
-    let mut delay = cortex_m::delay::Delay::new(core.SYST, clocks.system_clock.freq().to_Hz());
+    #[local]
+    struct Local {
+        led: Pin<Gpio25, Output<PushPull>>,
+    }
 
-    let pins = bsp::Pins::new(
-        pac.IO_BANK0,
-        pac.PADS_BANK0,
-        sio.gpio_bank0,
-        &mut pac.RESETS,
-    );
+    #[monotonic(binds = TIMER_IRQ_0, default = true)]
+    type Tonic = Rp2040Monotonic;
 
-    let mut led_pin = pins.led.into_push_pull_output();
+    #[idle]
+    fn idle(_: idle::Context) -> ! {
+        loop {
+            cortex_m::asm::wfi();
+        }
+    }
 
-    loop {
-        info!("on!");
-        led_pin.set_high().unwrap();
-        delay.delay_ms(500);
-        info!("off!");
-        led_pin.set_low().unwrap();
-        delay.delay_ms(500);
+    #[init]
+    fn init(cx: init::Context) -> (Shared, Local, init::Monotonics) {
+        // Soft-reset does not release the hardware spinlocks
+        // Release them now to avoid a deadlock after debug or watchdog reset
+        // This is normally done in the custom #[entry]
+        // Safety: As stated in the docs, this is the first thing that will
+        // run in the entry point of the firmware
+        unsafe {
+            hal::sio::spinlock_reset();
+        }
+
+        // Create the RTIC timer
+        let mono = Rp2040Monotonic::new(cx.device.TIMER);
+
+        // Grab the global RESETS
+        let mut resets = cx.device.RESETS;
+
+        // Setup the clocks
+        let mut watchdog = hal::Watchdog::new(cx.device.WATCHDOG);
+        let _clocks = hal::clocks::init_clocks_and_plls(
+            XOSC_CRYSTAL_FREQ,
+            cx.device.XOSC,
+            cx.device.CLOCKS,
+            cx.device.PLL_SYS,
+            cx.device.PLL_USB,
+            &mut resets,
+            &mut watchdog,
+        )
+        .ok()
+        .unwrap();
+
+        // Grab the pins and set them up
+        let sio = hal::Sio::new(cx.device.SIO);
+        let pins = bsp::Pins::new(
+            cx.device.IO_BANK0,
+            cx.device.PADS_BANK0,
+            sio.gpio_bank0,
+            &mut resets,
+        );
+
+        let mut led = pins.led.into_push_pull_output();
+        led.set_low().unwrap();
+
+        // Spawn the blinking task
+        blink::spawn_after(1.secs()).unwrap();
+
+        (Shared {}, Local { led }, init::Monotonics(mono))
+    }
+
+    #[task(local = [led])]
+    fn blink(cx: blink::Context) {
+        info!("Blink");
+        let led = cx.local.led;
+        led.toggle().unwrap();
+        // Schedule self to blink
+        blink::spawn_after(1.secs()).unwrap();
     }
 }
-
-// End of file

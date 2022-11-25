@@ -9,7 +9,6 @@ speed = 20000
 # usb_pid = "4444"
 # serial = "test"
 
-
 [default.flashing]
 enabled = true
 
