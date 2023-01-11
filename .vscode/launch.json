@@ -6,7 +6,7 @@
             "preLaunchTask": "rust: cargo build",
             "type": "probe-rs-debug",
             "request": "launch",
-            "name": "rp2040-project",
+            "name": "fem_firmware",
             "cwd": "${workspaceFolder}",
             "chip": "rp2040",
             // RP2040 doesn't support connectUnderReset
@@ -24,15 +24,13 @@
             "coreConfigs": [
                 {
                     "coreIndex": 0,
-                    "programBinary": "target/thumbv6m-none-eabi/debug/rp2040-project-template",
+                    "programBinary": "target/thumbv6m-none-eabi/debug/fem_firmware",
                     "chip": "RP2040",
-                    // Uncomment this if you've downloaded the SVD from
-                    // https://github.com/raspberrypi/pico-sdk/raw/1.3.1/src/rp2040/hardware_regs/rp2040.svd
-                    // and placed it in the .vscode directory
-                    // "svdFile": "./.vscode/rp2040.svd",
+                    "svdFile": "./.vscode/rp2040.svd",
                     "rttEnabled": true,
                     "options": {
                         "env": {
+                            "RUST_LOG": "warn",
                             "DEFMT_LOG": "debug"
                         }
                     },

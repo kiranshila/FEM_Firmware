@@ -11,7 +11,7 @@ use panic_probe as _;
 use rp2040_hal as hal;
 use rp2040_monotonic::{ExtU64, Rp2040Monotonic};
 
-use hal::gpio::{bank0::Gpio25, Output, Pin, PushPull};
+use hal::gpio::{bank0::Gpio21, Output, Pin, PushPull};
 
 // GPIO traits
 use embedded_hal::digital::v2::{OutputPin, ToggleableOutputPin};
@@ -26,7 +26,7 @@ mod app {
 
     #[local]
     struct Local {
-        led: Pin<Gpio25, Output<PushPull>>,
+        led: Pin<Gpio21, Output<PushPull>>,
     }
 
     #[monotonic(binds = TIMER_IRQ_0, default = true)]
