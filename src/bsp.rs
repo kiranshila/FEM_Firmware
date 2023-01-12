@@ -26,4 +26,12 @@ hal::bsp_pins! {
         name: rf2_lna_en,
         aliases: {PushPullOutput: Rf2LnaEn }
     },
+    Gpio26 {
+        name: rf1_if_pow,
+        aliases: {FloatingInput: Rf1IfPow}
+    }
+    Gpio27 {
+        name: rf2_if_pow,
+        aliases: {FloatingInput: Rf2IfPow}
+    }
 }

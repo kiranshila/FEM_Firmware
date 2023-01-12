@@ -2,6 +2,7 @@
 #![no_main]
 
 mod bsp;
+mod log_det;
 
 use bsp::*;
 use defmt::*;
@@ -11,6 +12,7 @@ use panic_probe as _;
 use rp2040_hal as hal;
 use rp2040_monotonic::{ExtU64, Rp2040Monotonic};
 
+use hal::adc::{Adc, TempSense};
 use hal::gpio::{bank0::Gpio21, Output, Pin, PushPull};
 
 // GPIO traits
@@ -30,6 +32,9 @@ mod app {
         rf2_status_led: Rf2StatusLed,
         lna_1: Rf1LnaEn,
         lna_2: Rf2LnaEn,
+        rf1_if_pow: Rf1IfPow,
+        rf2_if_pow: Rf2IfPow,
+        temp_sense: TempSense,
     }
 
     #[monotonic(binds = TIMER_IRQ_0, default = true)]
@@ -82,6 +87,12 @@ mod app {
             &mut resets,
         );
 
+        // Enable the ADC peripheral and internal temperature sensor
+        let mut adc = Adc::new(cx.device.ADC, &mut resets);
+        let temp_sense = adc.enable_temp_sensor();
+        let rf1_if_pow = pins.rf1_if_pow.into_floating_input();
+        let rf2_if_pow = pins.rf2_if_pow.into_floating_input();
+
         // Set the LNA outputs to ON by default
         let mut lna_1 = pins.rf1_lna_en.into_push_pull_output();
         let mut lna_2 = pins.rf2_lna_en.into_push_pull_output();
@@ -101,6 +112,9 @@ mod app {
                 lna_2,
                 rf1_status_led,
                 rf2_status_led,
+                rf1_if_pow,
+                rf2_if_pow,
+                temp_sense,
             },
             init::Monotonics(mono),
         )
