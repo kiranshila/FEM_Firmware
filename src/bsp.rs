@@ -10,7 +10,20 @@ pub static BOOT2: [u8; 256] = rp2040_boot2::BOOT_LOADER_IS25LP080;
 
 // And add all of our pins!
 hal::bsp_pins! {
+    Gpio20 {
+        name: rf1_status_led,
+        aliases: { PushPullOutput: Rf1StatusLed }
+    },
     Gpio21 {
-        name: led,
+        name: rf2_status_led,
+        aliases: {PushPullOutput: Rf2StatusLed }
+    },
+    Gpio22 {
+        name: rf1_lna_en,
+        aliases: {PushPullOutput: Rf1LnaEn }
+    },
+    Gpio23 {
+        name: rf2_lna_en,
+        aliases: {PushPullOutput: Rf2LnaEn }
     },
 }

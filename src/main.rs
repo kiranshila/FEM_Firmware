@@ -3,7 +3,7 @@
 
 mod bsp;
 
-use bsp::XOSC_CRYSTAL_FREQ;
+use bsp::*;
 use defmt::*;
 use defmt_rtt as _;
 use hal::pac;
@@ -26,7 +26,10 @@ mod app {
 
     #[local]
     struct Local {
-        led: Pin<Gpio21, Output<PushPull>>,
+        rf1_status_led: Rf1StatusLed,
+        rf2_status_led: Rf2StatusLed,
+        lna_1: Rf1LnaEn,
+        lna_2: Rf2LnaEn,
     }
 
     #[monotonic(binds = TIMER_IRQ_0, default = true)]
@@ -79,21 +82,27 @@ mod app {
             &mut resets,
         );
 
-        let mut led = pins.led.into_push_pull_output();
-        led.set_low().unwrap();
+        // Set the LNA outputs to ON by default
+        let mut lna_1 = pins.rf1_lna_en.into_push_pull_output();
+        let mut lna_2 = pins.rf2_lna_en.into_push_pull_output();
+        lna_1.set_high().unwrap();
+        lna_2.set_high().unwrap();
 
-        // Spawn the blinking task
-        blink::spawn_after(1.secs()).unwrap();
+        // Set the RF status LEDs to off
+        let mut rf1_status_led = pins.rf1_status_led.into_push_pull_output();
+        let mut rf2_status_led = pins.rf2_status_led.into_push_pull_output();
+        rf1_status_led.set_low().unwrap();
+        rf2_status_led.set_low().unwrap();
 
-        (Shared {}, Local { led }, init::Monotonics(mono))
-    }
-
-    #[task(local = [led])]
-    fn blink(cx: blink::Context) {
-        info!("Blink");
-        let led = cx.local.led;
-        led.toggle().unwrap();
-        // Schedule self to blink
-        blink::spawn_after(1.secs()).unwrap();
+        (
+            Shared {},
+            Local {
+                lna_1,
+                lna_2,
+                rf1_status_led,
+                rf2_status_led,
+            },
+            init::Monotonics(mono),
+        )
     }
 }
